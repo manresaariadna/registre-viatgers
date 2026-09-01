@@ -113,14 +113,14 @@ var DNI_SUPPORT_IMG = "data:image/webp;base64,UklGRhZeAQBXRUJQVlA4IApeAQDwTwqdAS
 
 /* ---------- Storage helpers ---------- */
 /* ======= CONFIGURACIÓ DE SUPABASE — edita aquestes dues línies ======= */
-var SUPABASE_URL = "ENGANXA_AQUI_LA_TEVA_URL_DE_SUPABASE";       // ex: https://abcdefgh.supabase.co
-var SUPABASE_ANON_KEY = "ENGANXA_AQUI_LA_TEVA_ANON_KEY";          // clau pública "anon" del projecte
+var SUPABASE_URL = "https://xfrvlapbnfpymjgmxfeq.supabase.co";
+var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Ovw_OuseWkX4eGR2V5D_uA_9RoY9LI5";
 /* ====================================================================== */
 
-function storageReady(){ return /^https?:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 10; }
+function storageReady(){ return /^https?:\/\//.test(SUPABASE_URL) && SUPABASE_PUBLISHABLE_KEY.length > 10; }
 function storageMissingError(){ return Promise.reject(new Error("STORAGE_UNAVAILABLE")); }
 function sbHeaders(extra){
-  var h = { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer "+SUPABASE_ANON_KEY, "Content-Type":"application/json" };
+  var h = { "apikey": SUPABASE_PUBLISHABLE_KEY, "Authorization": "Bearer "+SUPABASE_PUBLISHABLE_KEY, "Content-Type":"application/json" };
   if(extra){ for(var k in extra){ h[k]=extra[k]; } }
   return h;
 }
@@ -161,7 +161,7 @@ function slist(prefix){
     return { keys: (rows||[]).map(function(x){ return x.key; }) };
   }).catch(function(e){ if(e && e.message==="STORAGE_UNAVAILABLE") throw e; return {keys:[]}; });
 }
-var STORAGE_HELP = "No s'ha pogut connectar amb la base de dades de Supabase. Comprova que has enganxat correctament la URL i la clau «anon» del teu projecte a les línies SUPABASE_URL i SUPABASE_ANON_KEY del fitxer, que la taula «kv_store» existeix, i que has tornat a desplegar a Vercel després de fer el canvi.";
+var STORAGE_HELP = "No s'ha pogut connectar amb la base de dades de Supabase. Comprova que la URL i la clau publicable a SUPABASE_URL i SUPABASE_PUBLISHABLE_KEY són correctes, que la taula «kv_store» existeix, i que has tornat a desplegar a Vercel després de fer el canvi.";
 
 function getSettings(){
   return sget("settings").then(function(r){
