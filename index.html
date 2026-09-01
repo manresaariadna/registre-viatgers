@@ -2,6 +2,10 @@
 <html lang="ca">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Registre de viatgers — El Molí de Fornells</title>
 <style>
   :root{
@@ -127,8 +131,10 @@ function sbHeaders(extra){
 function sbFetch(url, opts){
   return fetch(url, opts).then(function(r){
     if(!r.ok) throw new Error("STORAGE_UNAVAILABLE");
-    if(r.status===204) return null;
-    return r.json();
+    return r.text().then(function(text){
+      if(!text) return null;
+      try{ return JSON.parse(text); }catch(e){ return null; }
+    });
   }, function(){ throw new Error("STORAGE_UNAVAILABLE"); });
 }
 function sget(key){
@@ -265,6 +271,8 @@ var I18N = {
     errParentesc:"Cal indicar la relació de parentesc, ja que ets menor d'edat.", errAdreca:"L'adreça és obligatòria.",
     errProvMun:"Cal indicar província i municipi.", errLocalitat:"La localitat és obligatòria.", errCp:"El codi postal és obligatori.",
     success:"Gràcies! Les teves dades ja s'han desat.",
+    errStorage:"No s'ha pogut connectar amb la base de dades. Comprova la connexió a internet i torna-ho a provar.",
+    errGeneric:"No s'ha pogut enviar. Torna-ho a provar en uns segons.",
     privacy:"Protecció de dades: aquestes dades es fan servir únicament per complir l'obligació legal de registre de viatgers (RD 933/2021) i per comunicar-les als Mossos d'Esquadra. No es cedeixen a tercers ni s'utilitzen amb cap altra finalitat, i s'eliminen un cop enviades a la policia. Pots exercir els teus drets d'accés, rectificació o supressió contactant directament amb l'allotjament."
   },
   es: {
@@ -289,6 +297,8 @@ var I18N = {
     errParentesc:"Hay que indicar la relación de parentesco, ya que eres menor de edad.", errAdreca:"La dirección es obligatoria.",
     errProvMun:"Hay que indicar provincia y municipio.", errLocalitat:"La localidad es obligatoria.", errCp:"El código postal es obligatorio.",
     success:"¡Gracias! Tus datos ya se han guardado.",
+    errStorage:"No se ha podido conectar con la base de datos. Comprueba la conexión a internet e inténtalo de nuevo.",
+    errGeneric:"No se ha podido enviar. Inténtalo de nuevo en unos segundos.",
     privacy:"Protección de datos: estos datos se usan únicamente para cumplir la obligación legal de registro de viajeros (RD 933/2021) y para comunicarlos a los Mossos d'Esquadra. No se ceden a terceros ni se usan con otra finalidad, y se eliminan una vez enviados a la policía. Puedes ejercer tus derechos de acceso, rectificación o supresión contactando directamente con el alojamiento."
   },
   en: {
@@ -313,6 +323,8 @@ var I18N = {
     errParentesc:"Please indicate the relationship, as you are under 18.", errAdreca:"Address is required.",
     errProvMun:"Please indicate province and municipality.", errLocalitat:"Town/City is required.", errCp:"Postal code is required.",
     success:"Thank you! Your details have been saved.",
+    errStorage:"Couldn't connect to the database. Check your internet connection and try again.",
+    errGeneric:"Couldn't submit. Please try again in a few seconds.",
     privacy:"Data protection: this data is used solely to comply with the legal obligation to register guests (Royal Decree 933/2021) and to report it to the Mossos d'Esquadra (Catalan police). It is not shared with third parties or used for any other purpose, and is deleted once submitted to the police. You can exercise your rights of access, rectification, or deletion by contacting the property directly."
   },
   fr: {
@@ -337,6 +349,8 @@ var I18N = {
     errParentesc:"Veuillez indiquer le lien de parenté, car vous êtes mineur.", errAdreca:"L'adresse est obligatoire.",
     errProvMun:"Veuillez indiquer la province et la municipalité.", errLocalitat:"La ville est obligatoire.", errCp:"Le code postal est obligatoire.",
     success:"Merci ! Vos informations ont bien été enregistrées.",
+    errStorage:"Impossible de se connecter à la base de données. Vérifiez votre connexion internet et réessayez.",
+    errGeneric:"Échec de l'envoi. Merci de réessayer dans quelques secondes.",
     privacy:"Protection des données : ces données sont utilisées uniquement pour respecter l'obligation légale d'enregistrement des voyageurs (décret royal 933/2021) et pour les transmettre aux Mossos d'Esquadra (police catalane). Elles ne sont pas partagées avec des tiers ni utilisées à d'autres fins, et sont supprimées une fois transmises à la police. Vous pouvez exercer vos droits d'accès, de rectification ou de suppression en contactant directement l'hébergement."
   }
 };
@@ -548,6 +562,9 @@ function renderGuestFormBody(code, meta, guests, lang, f, justSubmitted){
     var guestId = Date.now()+"-"+Math.floor(Math.random()*1000);
     sset("reserva:"+code+":guest:"+guestId, JSON.stringify(data)).then(function(){
       go("guestForm", { code: code, lang: lang, justSubmitted: true, formTmp: {} });
+    }).catch(function(err){
+      submitBtn.disabled = false; submitBtn.textContent = t.submit;
+      errBox.innerHTML = '<div class="error">'+(err && err.message==="STORAGE_UNAVAILABLE" ? esc(t.errStorage) : esc(t.errGeneric))+'</div>';
     });
   });
 }
@@ -655,8 +672,13 @@ function renderAdminNew(){
       document.getElementById("newErr").innerHTML = '<div class="error">Omple els camps obligatoris.</div>';
       return;
     }
+    var btn = document.getElementById("createBtn");
+    btn.disabled = true; btn.textContent = "Creant…";
     sset("reserva:"+code+":meta", JSON.stringify(meta)).then(function(){
       go("adminDetail", { code: code, justCreated:true });
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = "Crear reserva i generar codi";
+      document.getElementById("newErr").innerHTML = '<div class="error">'+STORAGE_HELP+'</div>';
     });
   });
 }
@@ -747,8 +769,13 @@ function renderAdminDetail(){
 
       document.getElementById("delBtn").addEventListener("click", function(){
         if(!confirm("Segur que vols esborrar aquesta reserva i totes les dades dels hostes? Aquesta acció no es pot desfer.")) return;
+        var btn = this;
+        btn.disabled = true; btn.textContent = "Eliminant…";
         var dels = [sdel("reserva:"+code+":meta")].concat(keys.map(sdel));
-        Promise.all(dels).then(function(){ go("adminHome"); });
+        Promise.all(dels).then(function(){ go("adminHome"); }).catch(function(){
+          btn.disabled = false; btn.textContent = "Esborrar aquesta reserva";
+          document.getElementById("dlWarn").innerHTML = '<div class="error">'+STORAGE_HELP+'</div>';
+        });
       });
     });
   });
@@ -773,6 +800,7 @@ function renderAdminGuestEdit(){
       '<label>Correu</label><input id="e_email" value="'+esc(data.email)+'">'+
       '<label>Municipi</label><input id="e_municipi" value="'+esc(data.municipi)+'">'+
       '<label>Codi postal</label><input id="e_cp" value="'+esc(data.cp)+'">'+
+      '<div id="editErr"></div>'+
       '<button class="btn btn-primary" id="saveGuest">Desar canvis</button>'+
       '<button class="btn btn-danger" id="delGuest">Eliminar aquest hoste</button>'+
       '</div>';
@@ -783,11 +811,23 @@ function renderAdminGuestEdit(){
         tipdoc:v("e_tipdoc"), numdoc:v("e_numdoc"), suport:v("e_suport"),
         tel:v("e_tel"), email:v("e_email"), municipi:v("e_municipi"), cp:v("e_cp")
       });
-      sset(state.guestKey, JSON.stringify(updated)).then(function(){ go("adminDetail", {code: state.code}); });
+      var btn = document.getElementById("saveGuest");
+      btn.disabled = true; btn.textContent = "Desant…";
+      sset(state.guestKey, JSON.stringify(updated)).then(function(){ go("adminDetail", {code: state.code}); })
+        .catch(function(){
+          btn.disabled = false; btn.textContent = "Desar canvis";
+          document.getElementById("editErr").innerHTML = '<div class="error">'+STORAGE_HELP+'</div>';
+        });
     });
     document.getElementById("delGuest").addEventListener("click", function(){
       if(!confirm("Eliminar aquest hoste de la reserva?")) return;
-      sdel(state.guestKey).then(function(){ go("adminDetail", {code: state.code}); });
+      var btn = document.getElementById("delGuest");
+      btn.disabled = true; btn.textContent = "Eliminant…";
+      sdel(state.guestKey).then(function(){ go("adminDetail", {code: state.code}); })
+        .catch(function(){
+          btn.disabled = false; btn.textContent = "Eliminar aquest hoste";
+          document.getElementById("editErr").innerHTML = '<div class="error">'+STORAGE_HELP+'</div>';
+        });
     });
   });
 }
@@ -818,8 +858,13 @@ function renderAdminSettings(){
     document.getElementById("saveSet").addEventListener("click", function(){
       var id = v("s_id");
       if(!id){ document.getElementById("setErr").innerHTML = '<div class="error">L\'identificador policial és obligatori.</div>'; return; }
+      var btn = document.getElementById("saveSet");
+      btn.disabled = true; btn.textContent = "Desant…";
       saveSettings({ idPolicial:id, telefon:v("s_tel"), publicBaseUrl:v("s_url").replace(/\/+$/,""), tipusPagament:v("s_pagament"), adminPin: v("s_pin")||DEFAULT_PIN }).then(function(){
         go("adminHome");
+      }).catch(function(){
+        btn.disabled = false; btn.textContent = "Desar";
+        document.getElementById("setErr").innerHTML = '<div class="error">'+STORAGE_HELP+'</div>';
       });
     });
   });
