@@ -96,7 +96,20 @@
   .notice{background:#FBF6E9;color:#6B4E10;border:1px solid #E6D3A3;padding:8px 10px;border-radius:7px;font-size:13px;margin-top:8px;}
   input.invalid{border-color:var(--warn);background:var(--warn-bg);}
   #under14Note{background:var(--ok-bg);color:var(--ok);border-radius:7px;padding:8px 10px;margin-top:8px;}
+  .scanBox{border:1.5px solid var(--gold);background:#FBF6E9;border-radius:10px;padding:12px 14px;margin:6px 0 4px;}
+  .scanBox .scanHead{font-weight:700;color:var(--forest);font-size:14.5px;}
+  .scanBox .btn{margin-top:10px;}
+  .linkish{display:block;background:none;border:none;padding:0;margin:10px auto 0;color:var(--rust-dark);text-decoration:underline;font-size:13.5px;cursor:pointer;font-family:inherit;text-align:center;}
+  .cam{position:relative;width:100%;aspect-ratio:3/4;background:#111;border-radius:12px;overflow:hidden;margin-top:12px;}
+  .cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .frame{position:absolute;left:6%;width:88%;aspect-ratio:1.586;top:50%;transform:translateY(-50%);border:3px solid #fff;border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);}
+  .mrzzone{position:absolute;left:0;right:0;bottom:0;height:34%;border-top:2px dashed rgba(255,255,255,.8);display:flex;align-items:flex-start;justify-content:center;}
+  .mrzzone span{margin-top:-11px;color:#fff;font-size:12px;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:10px;}
+  .scanstatus{margin-top:8px;font-size:13.5px;color:var(--forest);font-weight:600;text-align:center;}
+  .hiddenx{display:none !important;}
+  input.auto,select.auto{background:#FFF6D6;border-color:var(--gold);}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/tesseract.min.js" defer></script>
 </head>
 <body>
 <div id="app">Carregant…</div>
@@ -661,6 +674,578 @@ function renderGuestJoin(){
   });
 }
 
+/* ---------- Textos de l'escaneig del document ---------- */
+var SCAN_I18N = {
+  ca: {
+    title:"Vols estalviar temps?", opt:"opcional",
+    intro:"Escaneja el teu document d'identitat i omplirem les dades automàticament. La imatge es processa dins del teu mòbil: no s'envia ni es guarda enlloc.",
+    open:"📷 Escanejar el document", close:"Tancar la càmera", upload:"o puja una foto del document",
+    where:"Quina cara del document he d'enfocar?",
+    whereText:"La cara que té, a baix de tot, unes línies de lletres i números amb molts símbols <<<. Al DNI i al NIE/TIE és la cara de darrere; al passaport, la pàgina de la foto.",
+    zone:"línies <<< aquí",
+    st:{loading:"Preparant el lector…", searching:"Posa el document dins el marc, amb les línies <<< a baix…", almost:"Gairebé… mantén el document quiet i ben il·luminat",
+        notfound:"No trobo les línies <<<. Acosta el document, evita reflexos i posa-les dins la zona marcada.", address:"Document llegit ✓ Omplint les dades…"},
+    ok:"Hem omplert les dades del document. Revisa els camps en groc i completa la resta (telèfon, correu…).",
+    partial:"Hem omplert les dades, però alguna no s'ha pogut comprovar del tot. Revisa amb atenció els camps en groc.",
+    bad:"La lectura no és fiable. Revisa bé els camps en groc o torna a escanejar el document.",
+    noMrz:"No hem trobat les línies <<< a la foto. Prova amb la càmera o omple les dades a mà.",
+    denied:"No tenim permís per obrir la càmera. Pots pujar una foto o omplir les dades a mà.",
+    nocam:"No s'ha pogut obrir la càmera. Pots pujar una foto o omplir les dades a mà.",
+    lib:"No s'ha pogut carregar el lector de documents (cal connexió a internet). Pots omplir les dades a mà."
+  },
+  es: {
+    title:"¿Quieres ahorrar tiempo?", opt:"opcional",
+    intro:"Escanea tu documento de identidad y rellenaremos los datos automáticamente. La imagen se procesa dentro de tu móvil: no se envía ni se guarda en ningún sitio.",
+    open:"📷 Escanear el documento", close:"Cerrar la cámara", upload:"o sube una foto del documento",
+    where:"¿Qué cara del documento tengo que enfocar?",
+    whereText:"La cara que tiene, abajo del todo, unas líneas de letras y números con muchos símbolos <<<. En el DNI y en el NIE/TIE es la cara de detrás; en el pasaporte, la página de la foto.",
+    zone:"líneas <<< aquí",
+    st:{loading:"Preparando el lector…", searching:"Pon el documento dentro del marco, con las líneas <<< abajo…", almost:"Casi… mantén el documento quieto y bien iluminado",
+        notfound:"No encuentro las líneas <<<. Acerca el documento, evita reflejos y ponlas dentro de la zona marcada.", address:"Documento leído ✓ Rellenando los datos…"},
+    ok:"Hemos rellenado los datos del documento. Revisa los campos en amarillo y completa el resto (teléfono, correo…).",
+    partial:"Hemos rellenado los datos, pero alguno no se ha podido comprobar del todo. Revisa con atención los campos en amarillo.",
+    bad:"La lectura no es fiable. Revisa bien los campos en amarillo o vuelve a escanear el documento.",
+    noMrz:"No hemos encontrado las líneas <<< en la foto. Prueba con la cámara o rellena los datos a mano.",
+    denied:"No tenemos permiso para abrir la cámara. Puedes subir una foto o rellenar los datos a mano.",
+    nocam:"No se ha podido abrir la cámara. Puedes subir una foto o rellenar los datos a mano.",
+    lib:"No se ha podido cargar el lector de documentos (hace falta conexión a internet). Puedes rellenar los datos a mano."
+  },
+  en: {
+    title:"Want to save time?", opt:"optional",
+    intro:"Scan your ID document and we'll fill in your details automatically. The image is processed on your phone: it isn't sent or stored anywhere.",
+    open:"📷 Scan the document", close:"Close the camera", upload:"or upload a photo of the document",
+    where:"Which side of the document should I scan?",
+    whereText:"The side with lines of letters and numbers full of <<< symbols at the very bottom. On Spanish ID cards and residence cards it's the back; on passports, the photo page.",
+    zone:"<<< lines here",
+    st:{loading:"Getting the reader ready…", searching:"Place the document inside the frame, with the <<< lines at the bottom…", almost:"Almost… hold the document still and well lit",
+        notfound:"Can't find the <<< lines. Move closer, avoid glare and keep them inside the marked area.", address:"Document read ✓ Filling in your details…"},
+    ok:"We've filled in your document details. Check the yellow fields and complete the rest (phone, email…).",
+    partial:"We've filled in your details, but some couldn't be fully verified. Please check the yellow fields carefully.",
+    bad:"The reading isn't reliable. Check the yellow fields carefully or scan the document again.",
+    noMrz:"We couldn't find the <<< lines in the photo. Try the camera or fill in the details by hand.",
+    denied:"We don't have permission to use the camera. You can upload a photo or fill in the details by hand.",
+    nocam:"The camera couldn't be opened. You can upload a photo or fill in the details by hand.",
+    lib:"The document reader couldn't be loaded (an internet connection is needed). You can fill in the details by hand."
+  },
+  fr: {
+    title:"Vous voulez gagner du temps ?", opt:"facultatif",
+    intro:"Scannez votre pièce d'identité et nous remplirons vos informations automatiquement. L'image est traitée sur votre téléphone : elle n'est ni envoyée ni conservée.",
+    open:"📷 Scanner le document", close:"Fermer la caméra", upload:"ou envoyez une photo du document",
+    where:"Quelle face du document dois-je scanner ?",
+    whereText:"La face qui comporte, tout en bas, des lignes de lettres et de chiffres avec beaucoup de symboles <<<. Sur les cartes d'identité et titres de séjour, c'est le verso ; sur le passeport, la page de la photo.",
+    zone:"lignes <<< ici",
+    st:{loading:"Préparation du lecteur…", searching:"Placez le document dans le cadre, avec les lignes <<< en bas…", almost:"Presque… gardez le document immobile et bien éclairé",
+        notfound:"Je ne trouve pas les lignes <<<. Rapprochez le document, évitez les reflets et placez-les dans la zone indiquée.", address:"Document lu ✓ Remplissage des informations…"},
+    ok:"Nous avons rempli les informations du document. Vérifiez les champs en jaune et complétez le reste (téléphone, e-mail…).",
+    partial:"Nous avons rempli vos informations, mais certaines n'ont pas pu être entièrement vérifiées. Vérifiez attentivement les champs en jaune.",
+    bad:"La lecture n'est pas fiable. Vérifiez bien les champs en jaune ou scannez à nouveau le document.",
+    noMrz:"Nous n'avons pas trouvé les lignes <<< sur la photo. Essayez avec la caméra ou remplissez les informations à la main.",
+    denied:"Nous n'avons pas l'autorisation d'utiliser la caméra. Vous pouvez envoyer une photo ou remplir les informations à la main.",
+    nocam:"Impossible d'ouvrir la caméra. Vous pouvez envoyer une photo ou remplir les informations à la main.",
+    lib:"Le lecteur de documents n'a pas pu être chargé (une connexion internet est nécessaire). Vous pouvez remplir les informations à la main."
+  }
+};
+
+/* ---------- Lectura del document amb foto (voluntària). Tot es processa dins del mòbil ---------- */
+var DocScan = (function(){
+"use strict";
+var MRZ_LANG_PATH = "https://cdn.jsdelivr.net/gh/Shreeshrii/tessdata_ocrb@master";
+var PROVINCE_ALIASES = {"gerona":"17","lerida":"25","la coruna":"15","coruna":"15","orense":"32","guipuzcoa":"20","vizcaya":"48","alava":"01","araba":"01","baleares":"07","islas baleares":"07","balears":"07","alicante":"03","alacant":"03","castellon":"12","castello":"12","valencia":"46","rioja":"26","palmas":"35","tenerife":"38","navarra":"31","nafarroa":"31"};
+function norm(s){ return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim(); }
+function normMuni(s){ return norm(s).replace(/^(l|la|el|els|les|los|las|a|o|es|sa|ses|lo|os|as) /,""); }
+function isCountry(a3){ return isValidCountry(a3); }
+function dniLetterOk(n){
+  if(/^[0-9]{8}[A-Z]$/.test(n)) return DNI_LETTERS[parseInt(n.slice(0,8),10)%23]===n[8];
+  if(/^[XYZ][0-9]{7}[A-Z]$/.test(n)) return DNI_LETTERS[parseInt({X:"0",Y:"1",Z:"2"}[n[0]]+n.slice(1,8),10)%23]===n[8];
+  return false;
+}
+/* ---------- MRZ ---------- */
+var TO_DIGIT = {O:"0",Q:"0",D:"0",U:"0",I:"1",L:"1",T:"1",Z:"2",S:"5",B:"8",G:"6"};
+var TO_ALPHA = {"0":"O","1":"I","2":"Z","5":"S","8":"B","6":"G","4":"A","7":"T"};
+function fixDigits(s){ return s.split("").map(function(c){ return TO_DIGIT[c]||c; }).join(""); }
+function fixAlpha(s){ return s.split("").map(function(c){ return TO_ALPHA[c]||c; }).join(""); }
+function cd(s){
+  var w=[7,3,1], t=0;
+  for(var i=0;i<s.length;i++){
+    var c=s[i], val = c==="<" ? 0 : (/[0-9]/.test(c) ? +c : c.charCodeAt(0)-55);
+    t += val*w[i%3];
+  }
+  return String(t%10);
+}
+// Si el dígit de control no quadra, prova a canviar caràcters ambigus (0/O, 1/I, 8/B, 5/S, 2/Z, 6/G)
+var SWAP = {"0":"O","O":"0","1":"I","I":"1","8":"B","B":"8","5":"S","S":"5","2":"Z","Z":"2","6":"G","G":"6"};
+function fixByCheck(s, chk){
+  if(cd(s)===chk) return s;
+  var pos=[]; for(var i=0;i<s.length;i++){ if(SWAP[s[i]]) pos.push(i); }
+  if(pos.length>10) pos=pos.slice(0,10);
+  var masks=[]; for(var m=1;m<(1<<pos.length);m++) masks.push(m);
+  masks.sort(function(a,b){ return bits(a)-bits(b); });
+  for(var k=0;k<masks.length;k++){
+    var arr=s.split("");
+    for(var j=0;j<pos.length;j++){ if(masks[k]&(1<<j)) arr[pos[j]]=SWAP[arr[pos[j]]]; }
+    var cand=arr.join("");
+    if(cd(cand)===chk) return cand;
+  }
+  return s;
+}
+function bits(n){ var c=0; while(n){ c+=n&1; n>>=1; } return c; }
+function padTo(s,n){ s=s.slice(0,n); while(s.length<n) s+="<"; return s; }
+function mrzDate(s, isBirth){
+  if(!/^[0-9]{6}$/.test(s)) return "";
+  var yy=+s.slice(0,2), mm=+s.slice(2,4), dd=+s.slice(4,6);
+  if(mm<1||mm>12||dd<1||dd>31) return "";
+  var cur = new Date().getFullYear()%100;
+  var yyyy = isBirth ? (yy>cur ? 1900+yy : 2000+yy) : 2000+yy;
+  return yyyy+"-"+pad2(mm)+"-"+pad2(dd);
+}
+function country3(s){
+  s=fixAlpha(s);
+  if(s==="D<<") return "DEU";
+  s=s.replace(/</g,"");
+  return isCountry(s) ? s : "";
+}
+function parseNames(s){
+  s = fixAlpha(s);
+  // "<K<" / "<C<" dins els farciments solen ser "<" mal llegits
+  for(var i=0;i<3;i++) s = s.replace(/<[KC](?=<)/g,"<<");
+  s = s.replace(/[<KC]*$/, function(m){ return m.indexOf("<")>=0 ? "" : m; });
+  var idx = s.indexOf("<<");
+  var sur = idx>=0 ? s.slice(0,idx) : s;
+  var giv = idx>=0 ? s.slice(idx+2) : "";
+  return { surname: sur.replace(/</g," ").replace(/\s+/g," ").trim(), given: giv.replace(/</g," ").replace(/\s+/g," ").trim() };
+}
+function sexOf(c){ c=fixAlpha(c||""); return (c==="M"||c==="F") ? c : ""; }
+
+function parseTD1(a,b,c){
+  a=padTo(a,30); b=padTo(b,30); c=padTo(c,30);
+  var r = {format:"TD1", lines:[a,b,c]};
+  r.docCode = fixAlpha(a.slice(0,2));
+  r.issuer = country3(a.slice(2,5));
+  var docNum = a.slice(5,14), docChk = fixDigits(a[14]), opt1 = a.slice(15,30);
+  var dobRaw = fixDigits(b.slice(0,6)), dobChk = fixDigits(b[6]);
+  var expRaw = fixDigits(b.slice(8,14)), expChk = fixDigits(b[14]);
+  r.nat = country3(b.slice(15,18));
+  r.sex = sexOf(b[7]);
+  if(r.issuer==="ESP"){
+    var o0 = fixAlpha(opt1[0]);
+    if(/[XYZ]/.test(o0)){
+      r.nie = o0 + fixDigits(opt1.slice(1,8)) + fixAlpha(opt1[8]);
+      docNum = "E" + fixDigits(docNum.slice(1));
+      opt1 = r.nie + opt1.slice(9);
+    } else {
+      r.dni = fixDigits(opt1.slice(0,8)) + fixAlpha(opt1[8]);
+      docNum = fixAlpha(docNum.slice(0,3)) + fixDigits(docNum.slice(3));
+      opt1 = r.dni + opt1.slice(9);
+    }
+  } else {
+    docNum = fixByCheck(docNum, docChk);
+  }
+  r.docNum = docNum.replace(/<+$/,"");
+  r.dob = mrzDate(dobRaw, true);
+  r.checks = {
+    "Número de document": cd(docNum)===docChk,
+    "Data de naixement": cd(dobRaw)===dobChk,
+    "Data de caducitat": cd(expRaw)===expChk,
+    "Control global": cd(docNum+docChk+opt1+dobRaw+dobChk+expRaw+expChk+b.slice(18,29))===fixDigits(b[29])
+  };
+  if(r.dni) r.checks["Lletra del DNI"] = dniLetterOk(r.dni);
+  if(r.nie) r.checks["Lletra del NIE"] = dniLetterOk(r.nie);
+  var n = parseNames(c); r.surname=n.surname; r.given=n.given;
+  return r;
+}
+function parseTD3(a,b){
+  a=padTo(a,44); b=padTo(b,44);
+  var r = {format:"TD3", lines:[a,b]};
+  r.docCode = fixAlpha(a.slice(0,2));
+  r.issuer = country3(a.slice(2,5));
+  var n = parseNames(a.slice(5,44)); r.surname=n.surname; r.given=n.given;
+  var docChk = fixDigits(b[9]);
+  var docNum = fixByCheck(b.slice(0,9), docChk);
+  var dobRaw = fixDigits(b.slice(13,19)), dobChk=fixDigits(b[19]);
+  var expRaw = fixDigits(b.slice(21,27)), expChk=fixDigits(b[27]);
+  r.nat = country3(b.slice(10,13));
+  r.sex = sexOf(b[20]);
+  r.docNum = docNum.replace(/<+$/,"");
+  r.dob = mrzDate(dobRaw, true);
+  r.checks = {
+    "Número de document": cd(docNum)===docChk,
+    "Data de naixement": cd(dobRaw)===dobChk,
+    "Data de caducitat": cd(expRaw)===expChk,
+    "Control global": cd(docNum+docChk+dobRaw+dobChk+expRaw+expChk+b.slice(28,43))===fixDigits(b[43])
+  };
+  return r;
+}
+function parseTD2(a,b){
+  a=padTo(a,36); b=padTo(b,36);
+  var r = {format:"TD2", lines:[a,b]};
+  r.docCode = fixAlpha(a.slice(0,2));
+  r.issuer = country3(a.slice(2,5));
+  var n = parseNames(a.slice(5,36)); r.surname=n.surname; r.given=n.given;
+  var docChk = fixDigits(b[9]);
+  var docNum = fixByCheck(b.slice(0,9), docChk);
+  var dobRaw = fixDigits(b.slice(13,19)), dobChk=fixDigits(b[19]);
+  var expRaw = fixDigits(b.slice(21,27)), expChk=fixDigits(b[27]);
+  r.nat = country3(b.slice(10,13));
+  r.sex = sexOf(b[20]);
+  r.docNum = docNum.replace(/<+$/,"");
+  r.dob = mrzDate(dobRaw, true);
+  r.checks = {
+    "Número de document": cd(docNum)===docChk,
+    "Data de naixement": cd(dobRaw)===dobChk,
+    "Data de caducitat": cd(expRaw)===expChk,
+    "Control global": cd(docNum+docChk+dobRaw+dobChk+expRaw+expChk+b.slice(28,35))===fixDigits(b[35])
+  };
+  return r;
+}
+function score(r){ var s=0; for(var k in r.checks){ if(r.checks[k]) s++; } return s; }
+function isGood(r){ return r && r.checks["Número de document"] && r.checks["Data de naixement"]; }
+
+function findMrz(text){
+  var lines = text.split(/\n/).map(function(l){
+    return l.toUpperCase().replace(/\s/g,"").replace(/[«‹]/g,"<").replace(/[^A-Z0-9<]/g,"");
+  }).filter(function(l){ return l.length>=24; });
+  var cands = [];
+  for(var i=0;i<lines.length;i++){
+    var a=lines[i], b=lines[i+1], c=lines[i+2];
+    if(b && a.length>=40 && b.length>=40 && /^P/.test(a)) cands.push(parseTD3(a,b));
+    if(b && a.length>=33 && a.length<=39 && b.length>=33) cands.push(parseTD2(a,b));
+    if(b && c && a.length>=26 && a.length<=34 && b.length>=26 && c.length>=20) cands.push(parseTD1(a,b,c));
+    if(b && a.length>=40 && b.length>=40 && !/^P/.test(a)) cands.push(parseTD3(a,b));
+  }
+  cands.sort(function(x,y){ return score(y)-score(x); });
+  return cands[0] || null;
+}
+
+/* ---------- Imatge: retall, escala de grisos, contrast i blanc/negre ---------- */
+function newCanvas(w,h){ var c=document.createElement("canvas"); c.width=Math.max(1,Math.round(w)); c.height=Math.max(1,Math.round(h)); return c; }
+function cropScale(src, sx, sy, sw, sh, targetW){
+  var sc = targetW/sw;
+  var c = newCanvas(sw*sc, sh*sc);
+  var ctx = c.getContext("2d"); ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c;
+}
+function grayContrast(c){
+  var o = newCanvas(c.width, c.height), ctx = o.getContext("2d");
+  ctx.drawImage(c,0,0);
+  var d=ctx.getImageData(0,0,o.width,o.height), px=d.data, hist=new Array(256).fill(0), n=px.length/4;
+  for(var i=0;i<px.length;i+=4){ var g=(px[i]*0.299+px[i+1]*0.587+px[i+2]*0.114)|0; px[i]=g; hist[g]++; }
+  var lo=0,hi=255,acc=0; for(lo=0;lo<255;lo++){ acc+=hist[lo]; if(acc>n*0.01) break; }
+  acc=0; for(hi=255;hi>0;hi--){ acc+=hist[hi]; if(acc>n*0.01) break; }
+  var span=Math.max(1,hi-lo);
+  for(var j=0;j<px.length;j+=4){ var v=Math.max(0,Math.min(255,((px[j]-lo)*255/span)|0)); px[j]=px[j+1]=px[j+2]=v; }
+  ctx.putImageData(d,0,0);
+  o._hist = hist;
+  return o;
+}
+// Binarització local (llindar per zones): resisteix fons de colors i ombres
+function binarize(c){
+  var g = grayContrast(c), w=g.width, h=g.height, ctx=g.getContext("2d");
+  var d=ctx.getImageData(0,0,w,h), px=d.data;
+  var gray=new Float32Array(w*h); for(var i=0;i<w*h;i++) gray[i]=px[i*4];
+  var integ=new Float64Array((w+1)*(h+1));
+  for(var y=0;y<h;y++){ var row=0; for(var x=0;x<w;x++){ row+=gray[y*w+x]; integ[(y+1)*(w+1)+x+1]=integ[y*(w+1)+x+1]+row; } }
+  var r=Math.max(8, Math.round(Math.min(w,h)/14));
+  for(var y2=0;y2<h;y2++){
+    var y0=Math.max(0,y2-r), y1=Math.min(h-1,y2+r);
+    for(var x2=0;x2<w;x2++){
+      var x0=Math.max(0,x2-r), x1=Math.min(w-1,x2+r);
+      var cnt=(y1-y0+1)*(x1-x0+1);
+      var sum=integ[(y1+1)*(w+1)+x1+1]-integ[y0*(w+1)+x1+1]-integ[(y1+1)*(w+1)+x0]+integ[y0*(w+1)+x0];
+      var v = gray[y2*w+x2] < (sum/cnt)*0.86 ? 0 : 255;
+      var k=(y2*w+x2)*4; px[k]=px[k+1]=px[k+2]=v;
+    }
+  }
+  ctx.putImageData(d,0,0);
+  return g;
+}
+function loadImage(file){
+  return new Promise(function(res,rej){
+    var img=new Image(); img.onload=function(){ res(img); }; img.onerror=rej; img.src=URL.createObjectURL(file);
+  });
+}
+function rotated(img, rot, maxSide){
+  var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+  var rw = rot%180===0 ? w : h, rh = rot%180===0 ? h : w;
+  var scale = Math.min(1, maxSide/Math.max(rw,rh));
+  var c=newCanvas(rw*scale, rh*scale), ctx=c.getContext("2d");
+  ctx.translate(c.width/2,c.height/2); ctx.rotate(rot*Math.PI/180);
+  ctx.drawImage(img,-w*scale/2,-h*scale/2,w*scale,h*scale);
+  return c;
+}
+
+/* ---------- Adreça (part de darrere del DNI) ---------- */
+function findProvince(s){
+  var n = norm(s); if(!n) return "";
+  if(PROVINCE_ALIASES[n]) return PROVINCE_ALIASES[n];
+  for(var i=0;i<PROVINCES.length;i++){
+    var parts = PROVINCES[i][1].split("/").map(norm);
+    if(parts.indexOf(n)>=0) return PROVINCES[i][0];
+  }
+  for(var k in PROVINCE_ALIASES){ if(n.indexOf(k)>=0) return PROVINCE_ALIASES[k]; }
+  return "";
+}
+function findMuni(prov, s){
+  var q = normMuni(s); if(!q) return "";
+  var list = munisFor(prov);
+  var exact = list.filter(function(m){ return m[1].split("/").some(function(p){ return normMuni(p)===q; }); });
+  if(exact.length) return exact[0][0];
+  var starts = list.filter(function(m){ return normMuni(m[1]).indexOf(q)===0; });
+  return starts.length===1 ? starts[0][0] : "";
+}
+function extractAddress(text){
+  var lines = text.split(/\n/).map(function(l){ return l.replace(/[^A-Za-zÀ-ÿ0-9ºª,.'\/\- ]/g," ").replace(/\s+/g," ").trim(); })
+    .filter(function(l){ return l.length>=2; });
+  for(var i=0;i<lines.length;i++){
+    var m = lines[i].toUpperCase().match(/DOMICILI[OA]?\s*(.*)$/);
+    if(!m) continue;
+    var rest = lines.slice(i+1).filter(function(l){ return !/LUGAR|NACIMIENTO|HIJ[OA]|EQUIPO|IDESP/i.test(l); });
+    var street = m[1] && m[1].length>3 ? m[1] : rest.shift();
+    var muniLine = rest[0]||"", provLine = rest[1]||"";
+    var prov = findProvince(provLine) || findProvince(muniLine);
+    var muni = prov ? (findMuni(prov, muniLine) || "") : "";
+    return { adreca: (street||"").toUpperCase(), provincia: prov, municipiCode: muni, raw: [street, muniLine, provLine] };
+  }
+  return null;
+}
+
+/* ---------- De la MRZ als camps del formulari ---------- */
+var PARTICLES = ["DE","DEL","LA","LAS","LOS","Y","I","DA","DO","DOS","DAS"];
+function splitSpanishSurnames(s){
+  var toks = s.split(" ").filter(Boolean), groups=[], buf=[];
+  toks.forEach(function(t){ buf.push(t); if(PARTICLES.indexOf(t)<0){ groups.push(buf.join(" ")); buf=[]; } });
+  if(buf.length){ if(groups.length) groups[groups.length-1]+=" "+buf.join(" "); else groups.push(buf.join(" ")); }
+  return { cog1: groups[0]||"", cog2: groups.slice(1).join(" ") };
+}
+function mrzToFields(r){
+  var f = {};
+  f.nom = r.given;
+  if(r.issuer==="ESP"){ var sp = splitSpanishSurnames(r.surname); f.cog1=sp.cog1; f.cog2=sp.cog2; }
+  else { f.cog1 = r.surname; f.cog2 = ""; }
+  if(r.dob) f.dob = r.dob;
+  if(r.sex) f.sexe = r.sex;
+  if(r.nat) f.nac = r.nat;
+  if(r.docCode[0]==="P"){
+    f.tipdoc="P"; f.numdoc=r.docNum; f.passOrigin = r.issuer==="ESP" ? "spanish" : "foreign";
+  } else if(r.issuer==="ESP" && r.nie){
+    f.tipdoc="N"; f.numdoc=r.nie; f.suport=r.docNum;
+  } else if(r.issuer==="ESP" && r.dni){
+    f.tipdoc="D"; f.numdoc=r.dni; f.suport=r.docNum;
+  } else {
+    f.tipdoc="O"; f.numdoc=r.docNum;
+  }
+  if(r.issuer==="ESP") f.paisres="ESP";
+  else if(r.nat) f.paisres=r.nat;
+  return f;
+}
+
+
+/* ---------- Motor de lectura ---------- */
+var mrzWorker=null, spaWorker=null;
+function available(){ return typeof window.Tesseract !== "undefined"; }
+function getMrzWorker(){
+  if(mrzWorker) return mrzWorker;
+  mrzWorker = Tesseract.createWorker("ocrb_int", 1, { langPath: MRZ_LANG_PATH, gzip:false }).then(function(w){
+    return w.setParameters({ tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<", tessedit_pageseg_mode:"6" }).then(function(){ return w; });
+  });
+  mrzWorker.catch(function(){ mrzWorker=null; });
+  return mrzWorker;
+}
+function getSpaWorker(){
+  if(spaWorker) return spaWorker;
+  spaWorker = Tesseract.createWorker("spa", 1);
+  spaWorker.catch(function(){ spaWorker=null; });
+  return spaWorker;
+}
+function isReliable(r){
+  if(!isGood(r)) return false;
+  var total=Object.keys(r.checks).length;
+  return score(r) >= total-1 && r.checks["Lletra del DNI"]!==false && r.checks["Lletra del NIE"]!==false;
+}
+function ocrMrz(canvas){
+  return getMrzWorker().then(function(w){
+    var variants=[grayContrast(canvas), binarize(canvas)], best=null, i=0;
+    function next(){
+      if(i>=variants.length || isReliable(best)) return Promise.resolve(best);
+      return w.recognize(variants[i++]).then(function(res){
+        var r=findMrz(res.data.text);
+        if(r && (!best || score(r)>score(best))) best=r;
+        return next();
+      });
+    }
+    return next();
+  });
+}
+// Resultat final: camps per al formulari + qualitat de la lectura
+function buildResult(r, image, isCardCrop){
+  var fields = mrzToFields(r);
+  var failed = Object.keys(r.checks).filter(function(k){ return !r.checks[k]; });
+  var res = { fields: fields, quality: failed.length===0 ? "ok" : (isGood(r) ? "partial" : "bad") };
+  if(!(r.issuer==="ESP" && r.docCode[0]!=="P" && image)) return Promise.resolve(res);
+  return getSpaWorker().then(function(w){
+    var zone = isCardCrop ? cropScale(image, 0, 0, image.width, image.height*0.62, 2000) : image;
+    return w.recognize(grayContrast(zone));
+  }).then(function(o){
+    var a = extractAddress(o.data.text);
+    if(a){
+      if(a.adreca) fields.adreca=a.adreca;
+      if(a.provincia){ fields.provincia=a.provincia; fields.paisres="ESP"; }
+      if(a.municipiCode) fields.municipiCode=a.municipiCode;
+    }
+    return res;
+  }).catch(function(){ return res; });
+}
+
+// Càmera en directe: llegeix contínuament la zona del marc fins que les comprovacions quadren
+function startCamera(o){
+  var stream=null, running=true, busy=false, tries=0;
+  function stop(){ running=false; if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream=null; } }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ o.onError("nocam"); return stop; }
+  o.onStatus("loading");
+  navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1080} }, audio:false })
+  .then(function(s){
+    if(!running){ s.getTracks().forEach(function(t){ t.stop(); }); return; }
+    stream=s; o.video.srcObject=s;
+    o.onOpen();
+    return o.video.play().catch(function(){}).then(getMrzWorker).then(function(){ if(running){ o.onStatus("searching"); setTimeout(step, 400); } });
+  }).catch(function(e){
+    stop();
+    o.onError(e && e.name==="NotAllowedError" ? "denied" : (available() && e && e.name ? "nocam" : "lib"));
+  });
+  function grab(){
+    var v=o.video, vw=v.videoWidth, vh=v.videoHeight;
+    if(!vw || !vh) return null;
+    var box=o.box.getBoundingClientRect(), fr=o.frame.getBoundingClientRect();
+    var sc=Math.max(box.width/vw, box.height/vh), ox=(box.width-vw*sc)/2, oy=(box.height-vh*sc)/2;
+    var x=(fr.left-box.left-ox)/sc, y=(fr.top-box.top-oy)/sc, w=fr.width/sc, h=fr.height/sc;
+    x-=w*0.04; y-=h*0.06; w*=1.08; h*=1.12;
+    x=Math.max(0,x); y=Math.max(0,y); w=Math.min(vw-x,w); h=Math.min(vh-y,h);
+    return cropScale(v, x, y, w, h, Math.min(1600, Math.max(1000, w)));
+  }
+  function step(){
+    if(!running || busy) return;
+    var full=grab();
+    if(!full){ setTimeout(step, 300); return; }
+    busy=true; tries++;
+    ocrMrz(cropScale(full, 0, full.height*0.56, full.width, full.height*0.44, 1500)).then(function(r){
+      busy=false;
+      if(!running) return;
+      if(isReliable(r)){
+        stop();
+        if(navigator.vibrate) navigator.vibrate(180);
+        o.onStatus("address");
+        buildResult(r, full, true).then(o.onResult);
+        return;
+      }
+      o.onStatus(r ? "almost" : (tries>12 ? "notfound" : "searching"));
+      setTimeout(step, 120);
+    }).catch(function(){ busy=false; stop(); o.onError("lib"); });
+  }
+  return stop;
+}
+
+// Foto pujada: prova orientacions i zones fins a trobar les línies <<<
+function readFile(file, onStatus){
+  if(!available()) return Promise.reject("lib");
+  onStatus("loading");
+  var img;
+  return loadImage(file).then(function(i){ img=i; return getMrzWorker(); }).then(function(){
+    onStatus("searching");
+    var attempts=[[0,0.5],[0,0],[90,0],[270,0],[180,0.5]], best=null, bestFull=null, k=0, fulls={};
+    function next(){
+      if(k>=attempts.length || isReliable(best)) return Promise.resolve();
+      var a=attempts[k++];
+      var rc = fulls[a[0]] || (fulls[a[0]] = rotated(img, a[0], 2000));
+      return ocrMrz(cropScale(rc, 0, rc.height*a[1], rc.width, rc.height*(1-a[1]), 1500)).then(function(r){
+        if(r && (!best || score(r)>score(best))){ best=r; bestFull=rc; }
+        return next();
+      });
+    }
+    return next().then(function(){
+      if(!best || !isGood(best)) return null;
+      onStatus("address");
+      return buildResult(best, bestFull, false);
+    });
+  });
+}
+function preload(){ if(available()){ try{ getMrzWorker(); }catch(e){} } }
+return { available:available, startCamera:startCamera, readFile:readFile, preload:preload };
+})();
+
+/* ---------- Bloc «Escanejar el document» del formulari de l'hoste ---------- */
+var activeScanStop = null;
+function stopActiveScan(){ if(activeScanStop){ try{ activeScanStop(); }catch(e){} activeScanStop=null; } }
+var AUTO_FIELD_IDS = {nom:"g_nom",cog1:"g_cog1",cog2:"g_cog2",dob:"g_dob",sexe:"g_sexe",nac:"g_nac",tipdoc:"g_tipdoc",numdoc:"g_numdoc",
+  suport:"g_suport",paisres:"g_paisres",adreca:"g_adreca",provincia:"g_provincia",municipiCode:"g_municode"};
+function scanBoxHtml(lang){
+  var s = SCAN_I18N[lang];
+  var msg = "";
+  if(state.scanMsg){
+    var cls = state.scanMsg==="ok" ? "success" : (state.scanMsg==="partial" ? "notice" : "error");
+    msg = '<div class="'+cls+'" style="margin-top:10px;">'+esc(s[state.scanMsg])+'</div>';
+  }
+  return ''+
+  '<div class="scanBox">'+
+    '<div class="scanHead">'+esc(s.title)+' <span class="opt" style="font-weight:400;">('+esc(s.opt)+')</span></div>'+
+    '<p class="hint" style="margin-bottom:0;">'+esc(s.intro)+'</p>'+
+    '<div id="scanCam" class="cam hiddenx"><video id="scanVideo" playsinline muted autoplay></video>'+
+      '<div id="scanFrame" class="frame"><div class="mrzzone"><span>'+esc(s.zone)+'</span></div></div></div>'+
+    '<div id="scanStatus" class="scanstatus hiddenx"></div>'+
+    '<button type="button" class="btn btn-secondary" id="scanBtn">'+esc(s.open)+'</button>'+
+    '<label class="linkish">'+esc(s.upload)+'<input type="file" id="scanFile" accept="image/*" hidden></label>'+
+    '<button type="button" class="linkish" id="scanWhereBtn">'+esc(s.where)+'</button>'+
+    '<p class="hint hiddenx" id="scanWhere" style="margin-top:6px;">'+esc(s.whereText)+'</p>'+
+    '<div id="scanMsg">'+msg+'</div>'+
+  '</div>';
+}
+function markAutoFilled(){
+  (state.autoFilled||[]).forEach(function(k){
+    var e = document.getElementById(AUTO_FIELD_IDS[k]||"");
+    if(!e) return;
+    e.classList.add("auto");
+    var clear = function(){ e.classList.remove("auto"); };
+    e.addEventListener("input", clear); e.addEventListener("change", clear);
+  });
+}
+function bindScanBox(lang, onFields){
+  var s = SCAN_I18N[lang];
+  var btn = document.getElementById("scanBtn"), cam = document.getElementById("scanCam"), st = document.getElementById("scanStatus");
+  var msgBox = document.getElementById("scanMsg");
+  function showMsg(key, cls){ msgBox.innerHTML = '<div class="'+(cls||"error")+'" style="margin-top:10px;">'+esc(s[key])+'</div>'; }
+  function setStatus(k){ st.classList.remove("hiddenx"); st.textContent = s.st[k] || ""; }
+  function closeCam(){
+    stopActiveScan();
+    cam.classList.add("hiddenx"); st.classList.add("hiddenx");
+    btn.textContent = s.open;
+  }
+  document.getElementById("scanWhereBtn").addEventListener("click", function(){ document.getElementById("scanWhere").classList.toggle("hiddenx"); });
+  btn.addEventListener("click", function(){
+    if(activeScanStop){ closeCam(); return; }
+    msgBox.innerHTML = "";
+    if(!DocScan.available()){ showMsg("lib"); return; }
+    btn.textContent = s.close;
+    activeScanStop = DocScan.startCamera({
+      video: document.getElementById("scanVideo"), box: cam, frame: document.getElementById("scanFrame"),
+      onOpen: function(){ cam.classList.remove("hiddenx"); cam.scrollIntoView({behavior:"smooth", block:"center"}); },
+      onStatus: setStatus,
+      onResult: function(res){ activeScanStop = null; onFields(res.fields, res.quality); },
+      onError: function(code){ closeCam(); showMsg(code); }
+    });
+  });
+  document.getElementById("scanFile").addEventListener("change", function(){
+    var file = this.files && this.files[0]; this.value = "";
+    if(!file) return;
+    closeCam(); msgBox.innerHTML = "";
+    if(!DocScan.available()){ showMsg("lib"); return; }
+    btn.disabled = true;
+    DocScan.readFile(file, setStatus).then(function(res){
+      btn.disabled = false; st.classList.add("hiddenx");
+      if(!res){ showMsg("noMrz"); return; }
+      onFields(res.fields, res.quality);
+    }).catch(function(){ btn.disabled = false; st.classList.add("hiddenx"); showMsg("lib"); });
+  });
+}
+
 /* ---------- Validació comuna (formulari de l'hoste i panell del gestor) ---------- */
 function isoToday(){ var d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
 function validateGuest(d, t){
@@ -732,6 +1317,7 @@ function renderGuestForm(){
 }
 
 function renderGuestFormBody(code, meta, guests, lang, f, justSubmitted){
+  stopActiveScan();
   var t = I18N[lang];
   var expected = Number(meta.numPersones)||0;
 
@@ -754,6 +1340,7 @@ function renderGuestFormBody(code, meta, guests, lang, f, justSubmitted){
     '<div class="card">'+
       '<h3 style="margin-top:0;">'+esc(t.formHeading)+'</h3>'+
       '<p class="muted" style="margin-top:0;">'+esc(t.eachGuest)+'</p>'+
+      scanBoxHtml(lang)+
 
       '<label>'+esc(t.nom)+' *</label><input id="g_nom" value="'+esc(f.nom)+'">'+
       '<div class="row2">'+
@@ -809,6 +1396,21 @@ function renderGuestFormBody(code, meta, guests, lang, f, justSubmitted){
     '</div>';
 
   bindMuniWidget("g", f, t);
+  markAutoFilled();
+  bindScanBox(lang, function(fields, quality){
+    Object.keys(fields).forEach(function(k){ if(fields[k]==="" || fields[k]===undefined) delete fields[k]; });
+    var merged = collectFormValues();
+    if(fields.tipdoc){ merged.numdoc = ""; merged.suport = ""; merged.cog2 = ""; }
+    merged = Object.assign(merged, fields);
+    if(fields.municipiCode){ merged.muniAltre = false; merged.municipi = muniName(fields.municipiCode); }
+    else if(fields.provincia && fields.provincia!==f.provincia){ merged.municipiCode = ""; merged.municipi = ""; }
+    if(fields.passOrigin) f.passOrigin = fields.passOrigin;
+    state.formTmp = merged;
+    state.autoFilled = Object.keys(fields);
+    state.scanMsg = quality;
+    renderGuestFormBody(code, meta, guests, lang, merged, false);
+    var box = document.getElementById("scanMsg"); if(box) box.scrollIntoView({behavior:"smooth", block:"center"});
+  });
 
   el.querySelectorAll(".langBtn").forEach(function(b){
     b.addEventListener("click", function(){
@@ -893,6 +1495,7 @@ function renderGuestFormBody(code, meta, guests, lang, f, justSubmitted){
 
   document.getElementById("submitGuest").addEventListener("click", function(){
     var data = collectFormValues();
+    stopActiveScan();
     var age = ageFromDob(data.dob);
     if(!(age!==null && age<18)) data.parentesc = "";
     var errs = validateGuest(data, t);
